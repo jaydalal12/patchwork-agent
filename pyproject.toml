@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "patchwork"
+version = "0.1.0"
+description = "An autonomous agent that fixes failing tests in a Git repository and opens a verified pull request."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Jay Dalal" }]
+dependencies = [
+    "pydantic>=2.6",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+# LLM SDKs are optional so the package imports and unit-tests run without any key.
+anthropic = ["anthropic>=0.39"]
+gemini = ["google-generativeai>=0.8"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+]
+all = ["anthropic>=0.39", "google-generativeai>=0.8", "pytest>=8.0", "pytest-cov>=4.1"]
+
+[project.scripts]
+patchwork = "patchwork.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: end-to-end tests that drive the full agent loop (may be slow)",
+]
+addopts = "-ra"
+
+[tool.coverage.run]
+source = ["patchwork"]
+branch = true
