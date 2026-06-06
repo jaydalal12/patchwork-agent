@@ -48,6 +48,7 @@ def default_cases() -> List[EvalCase]:
     return [
         EvalCase("off_by_one", _FIXTURES / "off_by_one", "slice off-by-one in total()"),
         EvalCase("wrong_operator", _FIXTURES / "wrong_operator", "tautological palindrome check"),
+        EvalCase("multi_bug", _FIXTURES / "multi_bug", "two independent sign bugs (multi-step repair)"),
     ]
 
 
