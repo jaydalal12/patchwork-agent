@@ -1,5 +1,7 @@
 # Patchwork
 
+[![CI](https://github.com/jaydalal12/patchwork-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jaydalal12/patchwork-agent/actions/workflows/ci.yml)
+
 An autonomous agent that **fixes failing tests in a Git repository and opens a
 verified pull request.** Point it at a repo; it orients, diagnoses the failures
 (delegating root-cause analysis to an isolated subagent), makes the smallest
