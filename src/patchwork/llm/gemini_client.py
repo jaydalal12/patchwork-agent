@@ -45,6 +45,65 @@ def _clean_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+# -- pure translation (no SDK needed; unit-tested directly) ----------------
+def to_contents(messages: List[Message]) -> List[Dict[str, Any]]:
+    contents: List[Dict[str, Any]] = []
+    for m in messages:
+        if m.role == "user":
+            contents.append({"role": "user", "parts": [{"text": m.text}]})
+        elif m.role == "assistant":
+            parts: List[Dict[str, Any]] = []
+            if m.text:
+                parts.append({"text": m.text})
+            for tc in m.tool_calls:
+                parts.append({"function_call": {"name": tc.name, "args": tc.arguments}})
+            contents.append({"role": "model", "parts": parts})
+        elif m.role == "tool":
+            tr = m.tool_result
+            assert tr is not None
+            payload: Dict[str, Any] = {"error": tr.content} if tr.is_error else {"result": tr.content}
+            contents.append(
+                {"role": "user", "parts": [{"function_response": {"name": tr.name, "response": payload}}]}
+            )
+    return contents
+
+
+def to_tools(tools: List[ToolSpec]) -> List[Dict[str, Any]]:
+    return [
+        {
+            "function_declarations": [
+                {"name": t.name, "description": t.description, "parameters": _clean_schema(t.input_schema)}
+                for t in tools
+            ]
+        }
+    ]
+
+
+def parse_response(resp: Any) -> AssistantTurn:
+    text_parts: List[str] = []
+    calls: List[ToolCall] = []
+    idx = 0
+    candidate = resp.candidates[0] if resp.candidates else None
+    if candidate:
+        for part in candidate.content.parts:
+            fn = getattr(part, "function_call", None)
+            if fn and fn.name:
+                calls.append(ToolCall(id=f"gemini-{idx}", name=fn.name, arguments=dict(fn.args) if fn.args else {}))
+                idx += 1
+            elif getattr(part, "text", None):
+                text_parts.append(part.text)
+    usage = getattr(resp, "usage_metadata", None)
+    return AssistantTurn(
+        text="".join(text_parts),
+        tool_calls=calls,
+        usage=Usage(
+            input_tokens=getattr(usage, "prompt_token_count", 0) if usage else 0,
+            output_tokens=getattr(usage, "candidates_token_count", 0) if usage else 0,
+        ),
+        stop_reason=str(getattr(candidate, "finish_reason", "")) if candidate else "",
+    )
+
+
 class GeminiClient(LLMClient):
     def __init__(self, api_key: str, model: str, *, max_output_tokens: int = 4096):
         try:
@@ -58,48 +117,6 @@ class GeminiClient(LLMClient):
         self.model = model
         self._max_output_tokens = max_output_tokens
         self._limiter = RateLimiter(rate=1.0, burst=5)  # free tier is stingy
-
-    # -- translation ------------------------------------------------------
-    def _to_contents(self, messages: List[Message]) -> List[Dict[str, Any]]:
-        contents: List[Dict[str, Any]] = []
-        for m in messages:
-            if m.role == "user":
-                contents.append({"role": "user", "parts": [{"text": m.text}]})
-            elif m.role == "assistant":
-                parts: List[Dict[str, Any]] = []
-                if m.text:
-                    parts.append({"text": m.text})
-                for tc in m.tool_calls:
-                    parts.append({"function_call": {"name": tc.name, "args": tc.arguments}})
-                contents.append({"role": "model", "parts": parts})
-            elif m.role == "tool":
-                tr = m.tool_result
-                assert tr is not None
-                # Gemini keys responses by function name, not call id.
-                payload: Dict[str, Any] = {"result": tr.content}
-                if tr.is_error:
-                    payload = {"error": tr.content}
-                contents.append(
-                    {
-                        "role": "user",
-                        "parts": [{"function_response": {"name": tr.name, "response": payload}}],
-                    }
-                )
-        return contents
-
-    def _to_tools(self, tools: List[ToolSpec]) -> List[Dict[str, Any]]:
-        return [
-            {
-                "function_declarations": [
-                    {
-                        "name": t.name,
-                        "description": t.description,
-                        "parameters": _clean_schema(t.input_schema),
-                    }
-                    for t in tools
-                ]
-            }
-        ]
 
     def _call(self, system: str, contents, tools):
         genai = self._genai
@@ -124,37 +141,8 @@ class GeminiClient(LLMClient):
     def complete(self, *, system: str, messages: List[Message], tools: List[ToolSpec]) -> AssistantTurn:
         self._limiter.acquire()
         resp = retry_call(
-            lambda: self._call(system, self._to_contents(messages), self._to_tools(tools)),
+            lambda: self._call(system, to_contents(messages), to_tools(tools)),
             policy=BackoffPolicy(max_attempts=4),
             op_name="gemini.generate_content",
         )
-
-        text_parts: List[str] = []
-        calls: List[ToolCall] = []
-        idx = 0
-        candidate = resp.candidates[0] if resp.candidates else None
-        if candidate:
-            for part in candidate.content.parts:
-                fn = getattr(part, "function_call", None)
-                if fn and fn.name:
-                    calls.append(
-                        ToolCall(
-                            id=f"gemini-{idx}",
-                            name=fn.name,
-                            arguments=dict(fn.args) if fn.args else {},
-                        )
-                    )
-                    idx += 1
-                elif getattr(part, "text", None):
-                    text_parts.append(part.text)
-
-        usage = getattr(resp, "usage_metadata", None)
-        return AssistantTurn(
-            text="".join(text_parts),
-            tool_calls=calls,
-            usage=Usage(
-                input_tokens=getattr(usage, "prompt_token_count", 0) if usage else 0,
-                output_tokens=getattr(usage, "candidates_token_count", 0) if usage else 0,
-            ),
-            stop_reason=str(getattr(candidate, "finish_reason", "")) if candidate else "",
-        )
+        return parse_response(resp)

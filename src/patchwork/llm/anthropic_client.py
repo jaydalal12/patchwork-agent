@@ -25,6 +25,61 @@ from patchwork.resilience.retry import BackoffPolicy, retry_call
 _log = get_logger("llm.anthropic")
 
 
+# -- pure translation (no SDK needed; unit-tested directly) ----------------
+def to_api_messages(messages: List[Message]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for m in messages:
+        if m.role == "user":
+            out.append({"role": "user", "content": m.text})
+        elif m.role == "assistant":
+            content: List[Dict[str, Any]] = []
+            if m.text:
+                content.append({"type": "text", "text": m.text})
+            for tc in m.tool_calls:
+                content.append({"type": "tool_use", "id": tc.id, "name": tc.name, "input": tc.arguments})
+            out.append({"role": "assistant", "content": content})
+        elif m.role == "tool":
+            tr = m.tool_result
+            assert tr is not None
+            out.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tr.tool_call_id,
+                            "content": tr.content,
+                            "is_error": tr.is_error,
+                        }
+                    ],
+                }
+            )
+    return out
+
+
+def to_api_tools(tools: List[ToolSpec]) -> List[Dict[str, Any]]:
+    return [{"name": t.name, "description": t.description, "input_schema": t.input_schema} for t in tools]
+
+
+def parse_response(resp: Any) -> AssistantTurn:
+    text_parts: List[str] = []
+    calls: List[ToolCall] = []
+    for block in resp.content:
+        if block.type == "text":
+            text_parts.append(block.text)
+        elif block.type == "tool_use":
+            calls.append(ToolCall(id=block.id, name=block.name, arguments=dict(block.input)))
+    return AssistantTurn(
+        text="".join(text_parts),
+        tool_calls=calls,
+        usage=Usage(
+            input_tokens=getattr(resp.usage, "input_tokens", 0),
+            output_tokens=getattr(resp.usage, "output_tokens", 0),
+        ),
+        stop_reason=resp.stop_reason or "",
+    )
+
+
 class AnthropicClient(LLMClient):
     def __init__(self, api_key: str, model: str, *, max_tokens: int = 4096):
         try:
@@ -39,45 +94,6 @@ class AnthropicClient(LLMClient):
         self._max_tokens = max_tokens
         # Anthropic default tier allows generous RPM; keep a sane client-side cap.
         self._limiter = RateLimiter(rate=5.0, burst=10)
-
-    # -- translation ------------------------------------------------------
-    def _to_api_messages(self, messages: List[Message]) -> List[Dict[str, Any]]:
-        out: List[Dict[str, Any]] = []
-        for m in messages:
-            if m.role == "user":
-                out.append({"role": "user", "content": m.text})
-            elif m.role == "assistant":
-                content: List[Dict[str, Any]] = []
-                if m.text:
-                    content.append({"type": "text", "text": m.text})
-                for tc in m.tool_calls:
-                    content.append(
-                        {"type": "tool_use", "id": tc.id, "name": tc.name, "input": tc.arguments}
-                    )
-                out.append({"role": "assistant", "content": content})
-            elif m.role == "tool":
-                tr = m.tool_result
-                assert tr is not None
-                out.append(
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": tr.tool_call_id,
-                                "content": tr.content,
-                                "is_error": tr.is_error,
-                            }
-                        ],
-                    }
-                )
-        return out
-
-    def _to_api_tools(self, tools: List[ToolSpec]) -> List[Dict[str, Any]]:
-        return [
-            {"name": t.name, "description": t.description, "input_schema": t.input_schema}
-            for t in tools
-        ]
 
     # -- error mapping ----------------------------------------------------
     def _call(self, **kwargs):
@@ -107,30 +123,13 @@ class AnthropicClient(LLMClient):
                 model=self.model,
                 max_tokens=self._max_tokens,
                 system=system,
-                tools=self._to_api_tools(tools),
-                messages=self._to_api_messages(messages),
+                tools=to_api_tools(tools),
+                messages=to_api_messages(messages),
             ),
             policy=BackoffPolicy(max_attempts=4),
             op_name="anthropic.messages.create",
         )
-
-        text_parts: List[str] = []
-        calls: List[ToolCall] = []
-        for block in resp.content:
-            if block.type == "text":
-                text_parts.append(block.text)
-            elif block.type == "tool_use":
-                calls.append(ToolCall(id=block.id, name=block.name, arguments=dict(block.input)))
-
-        return AssistantTurn(
-            text="".join(text_parts),
-            tool_calls=calls,
-            usage=Usage(
-                input_tokens=getattr(resp.usage, "input_tokens", 0),
-                output_tokens=getattr(resp.usage, "output_tokens", 0),
-            ),
-            stop_reason=resp.stop_reason or "",
-        )
+        return parse_response(resp)
 
     def count_tokens(self, text: str) -> int:
         try:
