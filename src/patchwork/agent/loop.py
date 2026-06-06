@@ -57,10 +57,19 @@ def run_agent(
         in_tok += turn.usage.input_tokens
         out_tok += turn.usage.output_tokens
         conversation.add_assistant(turn)
+        _log.info(
+            "assistant turn",
+            turn=turns,
+            stop_reason=turn.stop_reason,
+            has_text=bool(turn.text),
+            n_tool_calls=len(turn.tool_calls),
+        )
         if on_step:
             on_step(turns, turn)
 
         if not turn.wants_tools:
+            if not turn.text:
+                _log.warning("agent produced no text and no tool calls", stop_reason=turn.stop_reason)
             _log.info("agent finished", turns=turns, tool_calls=tool_calls)
             return AgentResult(
                 final_text=turn.text,

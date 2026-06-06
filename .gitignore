@@ -25,3 +25,7 @@ runs/
 .DS_Store
 .idea/
 .vscode/
+
+# local run artifacts
+/run.json
+/err.log

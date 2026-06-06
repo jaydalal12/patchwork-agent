@@ -24,6 +24,11 @@ from patchwork.resilience.retry import BackoffPolicy, retry_call
 
 _log = get_logger("llm.gemini")
 
+# Gemini is our free-tier fallback path. Free tier enforces a tight per-minute
+# request budget, so we (a) pace requests well under it and (b) back off
+# patiently enough to ride out a full one-minute window if we still get 429.
+GEMINI_RETRY = BackoffPolicy(max_attempts=6, base_delay=5.0, max_delay=60.0, multiplier=2.0)
+
 
 def _clean_schema(schema: Dict[str, Any]) -> Dict[str, Any]:
     """Gemini's FunctionDeclaration accepts a subset of JSON Schema.
@@ -116,7 +121,8 @@ class GeminiClient(LLMClient):
         genai.configure(api_key=api_key)
         self.model = model
         self._max_output_tokens = max_output_tokens
-        self._limiter = RateLimiter(rate=1.0, burst=5)  # free tier is stingy
+        # ~1 request / 5s, no bursting — keeps under free-tier per-minute limits.
+        self._limiter = RateLimiter(rate=0.2, burst=2)
 
     def _call(self, system: str, contents, tools):
         genai = self._genai
@@ -142,7 +148,7 @@ class GeminiClient(LLMClient):
         self._limiter.acquire()
         resp = retry_call(
             lambda: self._call(system, to_contents(messages), to_tools(tools)),
-            policy=BackoffPolicy(max_attempts=4),
+            policy=GEMINI_RETRY,
             op_name="gemini.generate_content",
         )
         return parse_response(resp)
