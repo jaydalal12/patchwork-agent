@@ -62,12 +62,15 @@ def run_tests(ctx: ToolContext, target: str = "") -> dict:
     failures = _parse_failures(tail)
     ctx.scratch["last_failures"] = failures
     ctx.scratch["last_test_output"] = tail
+    # Keep the per-call payload small (free-tier request caps): show at most a
+    # handful of failures here; the full list stays in scratch for ci.parse_failures.
     return {
         "returncode": r.returncode,
         "green": r.returncode == 0,
         "counts": counts,
-        "failures": failures,
-        "output_tail": tail[-1200:],
+        "failures": failures[:6],
+        "failures_total": len(failures),
+        "output_tail": tail[-700:],
     }
 
 
