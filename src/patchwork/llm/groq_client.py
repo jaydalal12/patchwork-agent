@@ -108,7 +108,7 @@ class GroqClient(LLMClient):
             status = getattr(e, "status_code", None)
             if status and 500 <= status < 600:
                 raise TransientServiceError(f"groq {status}", status=status) from e
-            raise ExternalServiceError(f"groq error {status}", status=status) from e
+            raise ExternalServiceError(f"groq error {status}: {str(e)[:240]}", status=status) from e
         except g.APIConnectionError as e:
             raise TransientServiceError("groq connection error") from e
 
