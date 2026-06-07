@@ -25,6 +25,17 @@ from patchwork.resilience.retry import BackoffPolicy, retry_call
 _log = get_logger("llm.anthropic")
 
 
+# Anthropic restricts tool names to ^[a-zA-Z0-9_-]{1,64}$ — no dots. Our names
+# are "namespace.action", so we swap "." <-> "__" at this boundary only. (No
+# tool name contains "__", so the transform is reversible.)
+def _san(name: str) -> str:
+    return name.replace(".", "__")
+
+
+def _desan(name: str) -> str:
+    return name.replace("__", ".")
+
+
 # -- pure translation (no SDK needed; unit-tested directly) ----------------
 def to_api_messages(messages: List[Message]) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
@@ -36,7 +47,7 @@ def to_api_messages(messages: List[Message]) -> List[Dict[str, Any]]:
             if m.text:
                 content.append({"type": "text", "text": m.text})
             for tc in m.tool_calls:
-                content.append({"type": "tool_use", "id": tc.id, "name": tc.name, "input": tc.arguments})
+                content.append({"type": "tool_use", "id": tc.id, "name": _san(tc.name), "input": tc.arguments})
             out.append({"role": "assistant", "content": content})
         elif m.role == "tool":
             tr = m.tool_result
@@ -58,7 +69,7 @@ def to_api_messages(messages: List[Message]) -> List[Dict[str, Any]]:
 
 
 def to_api_tools(tools: List[ToolSpec]) -> List[Dict[str, Any]]:
-    return [{"name": t.name, "description": t.description, "input_schema": t.input_schema} for t in tools]
+    return [{"name": _san(t.name), "description": t.description, "input_schema": t.input_schema} for t in tools]
 
 
 def parse_response(resp: Any) -> AssistantTurn:
@@ -68,7 +79,7 @@ def parse_response(resp: Any) -> AssistantTurn:
         if block.type == "text":
             text_parts.append(block.text)
         elif block.type == "tool_use":
-            calls.append(ToolCall(id=block.id, name=block.name, arguments=dict(block.input)))
+            calls.append(ToolCall(id=block.id, name=_desan(block.name), arguments=dict(block.input)))
     return AssistantTurn(
         text="".join(text_parts),
         tool_calls=calls,
@@ -111,7 +122,7 @@ class AnthropicClient(LLMClient):
             status = getattr(e, "status_code", None)
             if status and 500 <= status < 600:
                 raise TransientServiceError(f"anthropic {status}", status=status) from e
-            raise ExternalServiceError(f"anthropic error {status}", status=status) from e
+            raise ExternalServiceError(f"anthropic error {status}: {str(e)[:240]}", status=status) from e
         except a.APIConnectionError as e:
             raise TransientServiceError("anthropic connection error") from e
 

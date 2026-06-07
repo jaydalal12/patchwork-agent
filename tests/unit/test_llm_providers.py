@@ -30,22 +30,31 @@ def test_anthropic_message_translation_roundtrips_roles():
     assert out[2]["content"][0]["tool_use_id"] == "c1"
 
 
-def test_anthropic_tool_translation():
-    assert ac.to_api_tools(SPECS)[0]["name"] == "git.status"
+def test_anthropic_tool_names_sanitized_no_dots():
+    # Anthropic rejects '.' in tool names; we swap to '__' and back.
+    name = ac.to_api_tools(SPECS)[0]["name"]
+    assert name == "git__status"
+    assert "." not in name
+    assert ac._desan(ac._san("ci.run_tests")) == "ci.run_tests"
 
 
-def test_anthropic_parse_extracts_text_and_tool_calls():
+def test_anthropic_assistant_tool_calls_sanitized_on_resend():
+    out = ac.to_api_messages(CONVO)
+    assert out[1]["content"][0]["name"] == "git__status"  # no dot on the wire
+
+
+def test_anthropic_parse_desanitizes_tool_call_names():
     resp = NS(
         content=[
             NS(type="text", text="working on it"),
-            NS(type="tool_use", id="t1", name="ci.run_tests", input={"target": "x"}),
+            NS(type="tool_use", id="t1", name="ci__run_tests", input={"target": "x"}),
         ],
         usage=NS(input_tokens=11, output_tokens=7),
         stop_reason="tool_use",
     )
     turn = ac.parse_response(resp)
     assert turn.text == "working on it"
-    assert turn.tool_calls[0].name == "ci.run_tests"
+    assert turn.tool_calls[0].name == "ci.run_tests"  # desanitized back to dotted
     assert turn.tool_calls[0].arguments == {"target": "x"}
     assert turn.usage.input_tokens == 11
 
