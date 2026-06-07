@@ -38,9 +38,17 @@ def run_agent(
     tool_ctx: ToolContext,
     conversation: ConversationContext,
     max_tool_calls: int,
+    dynamic_tools: bool = False,
     on_step: Optional[Callable[[int, AssistantTurn], None]] = None,
 ) -> AgentResult:
-    specs = registry.specs()
+    def build_specs():
+        # Dynamic mode advertises only the meta-tools plus what the model has
+        # loaded into ctx.active_tools — keeping each request small. Static mode
+        # advertises every domain tool (the meta-tools are hidden).
+        if dynamic_tools:
+            return registry.meta_specs() + registry.specs_for(sorted(tool_ctx.active_tools))
+        return registry.domain_specs()
+
     tool_calls = 0
     turns = 0
     in_tok = out_tok = 0
@@ -52,7 +60,7 @@ def run_agent(
             turn = llm.complete(
                 system=conversation.system_with_ledger(),
                 messages=conversation.messages,
-                tools=specs,
+                tools=build_specs(),
             )
         in_tok += turn.usage.input_tokens
         out_tok += turn.usage.output_tokens

@@ -24,9 +24,13 @@ class ScriptedLLM(LLMClient):
         self._turns = list(turns or [])
         self._react = react
         self.calls = 0
+        # Records the tool names advertised on each complete() call — lets tests
+        # assert what dynamic tool loading exposed per turn.
+        self.seen_tools: List[List[str]] = []
 
     def complete(self, *, system: str, messages: List[Message], tools: List[ToolSpec]) -> AssistantTurn:
         self.calls += 1
+        self.seen_tools.append([t.name for t in tools])
         if self._react is not None:
             return self._react(messages)
         if not self._turns:

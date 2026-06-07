@@ -18,7 +18,7 @@ from patchwork.config import Settings
 from patchwork.errors import BudgetExceededError
 from patchwork.llm.base import LLMClient
 from patchwork.observability import Tracer, get_logger
-from patchwork.prompts import REPAIR_SYSTEM
+from patchwork.prompts import DYNAMIC_TOOLS_PREAMBLE, REPAIR_SYSTEM
 from patchwork.registry import ToolRegistry
 from patchwork.tools.base import ToolContext
 from patchwork.tools.ci_tools import _parse_summary
@@ -81,8 +81,9 @@ def repair_repository(
     if open_pr and github_repo:
         instruction += f"\nThen open a pull request on {github_repo} from your fix branch to the default branch."
 
+    system = (DYNAMIC_TOOLS_PREAMBLE + REPAIR_SYSTEM) if settings.dynamic_tools else REPAIR_SYSTEM
     convo = ConversationContext(
-        system=REPAIR_SYSTEM,
+        system=system,
         token_budget=settings.context_token_budget,
         keep_recent=settings.context_keep_recent,
     )
@@ -97,6 +98,7 @@ def repair_repository(
                 tool_ctx=ctx,
                 conversation=convo,
                 max_tool_calls=settings.max_tool_calls,
+                dynamic_tools=settings.dynamic_tools,
             )
         final_text = result.final_text
         tool_calls, turns, ledger = result.tool_calls, result.turns, result.ledger

@@ -140,3 +140,6 @@ class ToolContext:
     llm: Any = None  # patchwork.llm.base.LLMClient (for subagents)
     registry: Any = None  # patchwork.registry.ToolRegistry (for subagents)
     scratch: Dict[str, Any] = field(default_factory=dict)
+    # Names the model has activated this session (dynamic tool loading). The
+    # loop advertises only these (+ the meta tools); tools.load mutates it.
+    active_tools: set = field(default_factory=set)

@@ -26,7 +26,12 @@ _BUILTIN_MODULES = [
     "patchwork.tools.ci_tools",
     "patchwork.tools.code_tools",
     "patchwork.tools.orchestration_tools",
+    "patchwork.tools.meta_tools",
 ]
+
+# Tools in this namespace are the dynamic-loading meta-tools, advertised
+# separately from the domain tools.
+META_NAMESPACE = "tools"
 
 
 class ToolRegistry:
@@ -76,12 +81,24 @@ class ToolRegistry:
         except KeyError:
             raise ToolNotFoundError(f"no such tool: {name}", tool=name) from None
 
+    def _spec(self, t: Tool) -> ToolSpec:
+        return ToolSpec(name=t.name, description=t.description, input_schema=t.input_schema)
+
     def specs(self) -> List[ToolSpec]:
-        """What we advertise to the model."""
-        return [
-            ToolSpec(name=t.name, description=t.description, input_schema=t.input_schema)
-            for t in self._tools.values()
-        ]
+        """Every tool's spec (static mode advertises all of these)."""
+        return [self._spec(t) for t in self._tools.values()]
+
+    def domain_specs(self) -> List[ToolSpec]:
+        """Domain tools only — excludes the dynamic-loading meta-tools."""
+        return [self._spec(t) for t in self._tools.values() if t.namespace != META_NAMESPACE]
+
+    def meta_specs(self) -> List[ToolSpec]:
+        """The dynamic-loading meta-tools (tools.search / load / namespaces)."""
+        return [self._spec(t) for t in self._tools.values() if t.namespace == META_NAMESPACE]
+
+    def specs_for(self, names: Iterable[str]) -> List[ToolSpec]:
+        """Specs for a specific set of tool names (the model's active set)."""
+        return [self._spec(self._tools[n]) for n in names if n in self._tools]
 
     def scoped(
         self,
