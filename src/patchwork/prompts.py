@@ -31,6 +31,10 @@ Operating discipline — follow this loop:
    root cause, the fix, and the verification evidence (test counts before/after).
 
 Rules:
+- ALWAYS use exact, real paths and pytest node ids returned by the tools (e.g.
+  from ci.run_tests, ci.parse_failures, code.list_files, code.find_definition).
+  NEVER invent placeholders like "test_x.py" or "path_to_broken_file.py" — if you
+  don't know a path, discover it with a tool first.
 - One logical fix per commit; keep the diff small and reviewable.
 - If you cannot make the suite green within budget, STOP and report exactly \
   which tests remain red and your best current hypothesis. An honest partial \

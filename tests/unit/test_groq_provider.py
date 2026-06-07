@@ -46,6 +46,21 @@ def test_parse_decodes_tool_call_arguments_and_usage():
     assert turn.stop_reason == "tool_calls"
 
 
+def test_parse_coerces_non_dict_arguments_to_empty():
+    # Models sometimes emit the JSON literal "null" or a bare list for a
+    # no-arg tool; that must become {} so **args never blows up.
+    for bad in ("null", "[1,2]", '"hi"'):
+        resp = NS(
+            choices=[NS(
+                message=NS(content=None, tool_calls=[NS(id="t", function=NS(name="git.status", arguments=bad))]),
+                finish_reason="tool_calls",
+            )],
+            usage=None,
+        )
+        turn = q.parse_response(resp)
+        assert turn.tool_calls[0].arguments == {}
+
+
 def test_parse_tolerates_malformed_arguments():
     resp = NS(
         choices=[NS(

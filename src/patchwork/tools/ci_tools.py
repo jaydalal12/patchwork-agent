@@ -67,7 +67,7 @@ def run_tests(ctx: ToolContext, target: str = "") -> dict:
         "green": r.returncode == 0,
         "counts": counts,
         "failures": failures,
-        "output_tail": tail[-2500:],
+        "output_tail": tail[-1200:],
     }
 
 
@@ -104,7 +104,7 @@ def failure_detail(ctx: ToolContext, node_id: str) -> str:
     r = _sb(ctx).run(
         ["python", "-m", "pytest", node_id, "-q", "--tb=long", "-rA"], timeout=180
     )
-    return (r.stdout + "\n" + r.stderr)[-6000:]
+    return (r.stdout + "\n" + r.stderr)[-2500:]
 
 
 @tool(namespace="ci", scope="read", descriptions={"path": "python file to syntax-check"})

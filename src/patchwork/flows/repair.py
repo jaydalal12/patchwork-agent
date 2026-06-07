@@ -84,6 +84,7 @@ def repair_repository(
     convo = ConversationContext(
         system=REPAIR_SYSTEM,
         token_budget=settings.context_token_budget,
+        keep_recent=settings.context_keep_recent,
     )
     convo.add_user(instruction)
 

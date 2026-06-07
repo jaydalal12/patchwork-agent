@@ -115,6 +115,8 @@ def run_agent(
 
 
 def _brief_args(args: dict) -> str:
+    if not args:
+        return ""
     parts = []
     for k, v in list(args.items())[:3]:
         s = str(v)

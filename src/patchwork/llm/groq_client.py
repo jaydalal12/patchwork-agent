@@ -61,6 +61,8 @@ def parse_response(resp: Any) -> AssistantTurn:
             args = json.loads(tc.function.arguments or "{}")
         except (ValueError, TypeError):
             args = {}
+        if not isinstance(args, dict):  # model can emit "null" / a bare list
+            args = {}
         calls.append(ToolCall(id=tc.id, name=tc.function.name, arguments=args))
     usage = getattr(resp, "usage", None)
     return AssistantTurn(
@@ -75,7 +77,7 @@ def parse_response(resp: Any) -> AssistantTurn:
 
 
 class GroqClient(LLMClient):
-    def __init__(self, api_key: str, model: str, *, max_tokens: int = 4096, rpm: int = 30):
+    def __init__(self, api_key: str, model: str, *, max_tokens: int = 1500, rpm: int = 30):
         try:
             import groq
         except ImportError as e:  # pragma: no cover
@@ -83,6 +85,9 @@ class GroqClient(LLMClient):
         self._groq = groq
         self._client = groq.Groq(api_key=api_key)
         self.model = model
+        # Groq counts max_tokens toward the per-request token cap (free tier
+        # ~8k), so keep the completion reservation small — tool-call responses
+        # and the final report are short anyway.
         self._max_tokens = max_tokens
         rate = max(0.1, (rpm * 0.9) / 60.0)
         self._limiter = RateLimiter(rate=rate, burst=max(2, rpm // 6))

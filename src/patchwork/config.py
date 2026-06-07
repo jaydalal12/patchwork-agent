@@ -43,7 +43,10 @@ class Settings(BaseModel):
     github_token: Optional[str] = None
 
     max_tool_calls: int = Field(default=60, ge=1)
-    context_token_budget: int = Field(default=120_000, ge=10_000)
+    # Default suits large-context paid models. Free tiers (Groq ~8-12k TPM)
+    # need a small budget so the transcript compacts and requests stay tiny.
+    context_token_budget: int = Field(default=120_000, ge=2_000)
+    context_keep_recent: int = Field(default=8, ge=2)
 
     sandbox_root: Path = Field(default_factory=lambda: Path(".patchwork_sandbox"))
     log_level: str = "INFO"
@@ -85,6 +88,7 @@ class Settings(BaseModel):
             github_token=os.getenv("GITHUB_TOKEN"),
             max_tool_calls=int(os.getenv("PATCHWORK_MAX_TOOL_CALLS", "60")),
             context_token_budget=int(os.getenv("PATCHWORK_CONTEXT_TOKEN_BUDGET", "120000")),
+            context_keep_recent=int(os.getenv("PATCHWORK_CONTEXT_KEEP_RECENT", "8")),
             sandbox_root=Path(os.getenv("PATCHWORK_SANDBOX_ROOT", ".patchwork_sandbox")),
             log_level=os.getenv("PATCHWORK_LOG_LEVEL", "INFO"),
             log_json=_env_bool("PATCHWORK_LOG_JSON", False),
