@@ -12,7 +12,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-Provider = Literal["anthropic", "gemini"]
+Provider = Literal["anthropic", "groq", "gemini"]
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -36,6 +36,10 @@ class Settings(BaseModel):
     # free 2.5-flash ~10, free 2.0-flash-lite ~30, paid much higher.
     gemini_rpm: int = Field(default=10, ge=1)
 
+    groq_api_key: Optional[str] = None
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_rpm: int = Field(default=30, ge=1)
+
     github_token: Optional[str] = None
 
     max_tool_calls: int = Field(default=60, ge=1)
@@ -54,17 +58,19 @@ class Settings(BaseModel):
             return self.provider
         if self.anthropic_api_key:
             return "anthropic"
+        if self.groq_api_key:
+            return "groq"
         if self.gemini_api_key:
             return "gemini"
         raise ConfigError(
-            "No LLM provider available: set ANTHROPIC_API_KEY or GEMINI_API_KEY "
-            "(or PATCHWORK_LLM_PROVIDER explicitly)."
+            "No LLM provider available: set ANTHROPIC_API_KEY, GROQ_API_KEY, or "
+            "GEMINI_API_KEY (or PATCHWORK_LLM_PROVIDER explicitly)."
         )
 
     @classmethod
     def from_env(cls) -> "Settings":
         provider = os.getenv("PATCHWORK_LLM_PROVIDER") or None
-        if provider not in (None, "anthropic", "gemini"):
+        if provider not in (None, "anthropic", "groq", "gemini"):
             raise ConfigError(f"Unknown PATCHWORK_LLM_PROVIDER={provider!r}")
         return cls(
             provider=provider,  # type: ignore[arg-type]
@@ -73,6 +79,9 @@ class Settings(BaseModel):
             gemini_api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"),
             gemini_model=os.getenv("PATCHWORK_GEMINI_MODEL", "gemini-2.5-pro"),
             gemini_rpm=int(os.getenv("PATCHWORK_GEMINI_RPM", "10")),
+            groq_api_key=os.getenv("GROQ_API_KEY"),
+            groq_model=os.getenv("PATCHWORK_GROQ_MODEL", "llama-3.3-70b-versatile"),
+            groq_rpm=int(os.getenv("PATCHWORK_GROQ_RPM", "30")),
             github_token=os.getenv("GITHUB_TOKEN"),
             max_tool_calls=int(os.getenv("PATCHWORK_MAX_TOOL_CALLS", "60")),
             context_token_budget=int(os.getenv("PATCHWORK_CONTEXT_TOKEN_BUDGET", "120000")),

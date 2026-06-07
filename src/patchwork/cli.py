@@ -39,6 +39,7 @@ def _cmd_doctor(args, settings: Settings) -> int:
     checks = {
         "git on PATH": shutil.which("git") is not None,
         "ANTHROPIC_API_KEY set": bool(settings.anthropic_api_key),
+        "GROQ_API_KEY set": bool(settings.groq_api_key),
         "GEMINI_API_KEY set": bool(settings.gemini_api_key),
         "GITHUB_TOKEN set": bool(settings.github_token),
     }

@@ -19,11 +19,12 @@ dependencies = [
 # LLM SDKs are optional so the package imports and unit-tests run without any key.
 anthropic = ["anthropic>=0.39"]
 gemini = ["google-generativeai>=0.8"]
+groq = ["groq>=0.11"]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=4.1",
 ]
-all = ["anthropic>=0.39", "google-generativeai>=0.8", "pytest>=8.0", "pytest-cov>=4.1"]
+all = ["anthropic>=0.39", "google-generativeai>=0.8", "groq>=0.11", "pytest>=8.0", "pytest-cov>=4.1"]
 
 [project.scripts]
 patchwork = "patchwork.cli:main"

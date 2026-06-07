@@ -20,6 +20,13 @@ def build_llm(settings: Settings) -> LLMClient:
 
         return AnthropicClient(settings.anthropic_api_key, settings.anthropic_model)
 
+    if provider == "groq":
+        if not settings.groq_api_key:
+            raise ConfigError("provider=groq but GROQ_API_KEY is unset")
+        from patchwork.llm.groq_client import GroqClient
+
+        return GroqClient(settings.groq_api_key, settings.groq_model, rpm=settings.groq_rpm)
+
     if provider == "gemini":
         if not settings.gemini_api_key:
             raise ConfigError("provider=gemini but GEMINI_API_KEY is unset")

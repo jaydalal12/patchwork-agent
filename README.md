@@ -40,9 +40,11 @@ patchwork doctor                 # check keys, git, registry
 patchwork tools                  # list all 54 tools by namespace
 ```
 
-Configure a provider (copy `.env.example` → `.env`). **Anthropic is preferred;
-Gemini is the automatic fallback** when only `GEMINI_API_KEY` is set — the agent
-loop is identical either way (`llm/` abstracts the provider).
+Configure a provider (copy `.env.example` → `.env`). Three are supported —
+**Anthropic, Groq, and Gemini** — selected by `PATCHWORK_LLM_PROVIDER` or
+auto-detected from whichever key is set (preference: Anthropic → Groq → Gemini).
+The agent loop is identical across all three; `llm/` abstracts the provider, and
+each has a client-side RPM knob (`PATCHWORK_<PROVIDER>_RPM`) to match your tier.
 
 Fix a local repo:
 
@@ -78,7 +80,7 @@ src/patchwork/
   errors.py            error taxonomy (retryable vs not)
   observability.py     structured logging + span tracer
   resilience/          retry (exp backoff + jitter), token-bucket rate limiter
-  llm/                 provider-neutral protocol; anthropic + gemini impls; factory
+  llm/                 provider-neutral protocol; anthropic + groq + gemini impls; factory
   registry.py          model-driven dispatch, scoped views, validated execution
   tools/               git / github / ci / code / orchestration namespaces + sandbox
   agent/               conversation context (compaction), control loop, subagent harness
