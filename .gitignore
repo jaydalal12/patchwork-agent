@@ -32,3 +32,6 @@ runs/
 
 # exported session transcripts (may contain secrets)
 exported-conversation-*.txt
+
+# local recording prep (not part of submission)
+VIDEO_SCRIPT.md
