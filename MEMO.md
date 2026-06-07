@@ -10,7 +10,10 @@ control loop driving a **54-tool registry** across five namespaces
 (`git`, `github`, `ci`, `code`, `orchestration`). The model selects tools; the
 registry dispatches by dict lookup and validates inputs against schemas derived
 from the tool function signatures — so adding the 55th tool is a decorated
-function, never a new branch in a dispatcher.
+function, never a new branch in a dispatcher. It also scales *down*: with
+`PATCHWORK_DYNAMIC_TOOLS`, the model is shown only meta-tools
+(`tools.namespaces`/`search`/`load`) and activates the handful it needs per
+turn, cutting each request ~3× to fit small free-tier caps.
 
 The flagship flow (`flows/repair.py`) is genuinely long-horizon: orient → run
 suite → delegate root-cause analysis to a **read-only subagent** → patch →
@@ -45,14 +48,11 @@ without any API key (a scripted LLM drives the real loop, sandbox, and pytest).
 - **A real patch/AST editor.** Edits are string- and line-range-based. This is
   enough for the bug classes in the fixtures and keeps diffs minimal, but it
   can't do semantic refactors.
-- **Dynamic tool loading.** All 54 tool schemas are sent on every request
-  (~4.5k tokens). On a large-context paid model this is irrelevant; on free
-  tiers it dominates the request. I measured Groq's `gpt-oss-120b` free tier at
-  ~8k tokens per request (and it counts `max_tokens` toward that cap) with a
-  ~8k/min TPM — so the schema overhead alone caps how many calls fit per minute.
-  Small fixes (e.g. the `off_by_one` fixture) run clean and verified-green on
-  free Groq; an 8-bug repo needs a higher tier. The right fix is a tool-search /
-  lazy-load step that sends only the relevant schemas per turn — see below.
+- **Broader provider TPM headroom.** I measured Groq's `gpt-oss-120b` free tier
+  at ~8k tokens per request (it counts `max_tokens` toward that cap) with a tight
+  per-minute/day budget. Rather than depend on a paid tier, I built **dynamic
+  tool loading** (below) to shrink requests; the remaining ceiling is just the
+  free daily token budget, which heavy testing exhausts.
 - **Persistent run store + dashboard.** Traces live in memory and print as a
   summary; I did not add a database or UI. The span model is there to make that
   a small addition, not a rewrite.
@@ -62,11 +62,13 @@ without any API key (a scripted LLM drives the real loop, sandbox, and pytest).
 
 ## What more time would address
 
-1. **Dynamic tool loading** — expose namespaces plus a `search_tools`/`load_tools`
-   step so each turn carries only the ~8–12 relevant schemas instead of all 54.
-   This is the highest-leverage item: it cuts request size ~3×, makes the agent
-   viable on small free tiers, and is how registries actually stay coherent past
-   fifty tools without flooding context.
+1. **Harden dynamic tool loading** (now shipped, opt-in via
+   `PATCHWORK_DYNAMIC_TOOLS`). The meta-tools — `tools.namespaces` / `search` /
+   `load` — let the model activate only the handful of schemas it needs per turn
+   instead of all 54, cutting request size ~3×. Validated live on Groq (the
+   model ran `namespaces → search → load` then proceeded). Next: make it the
+   default, add a relevance ranker better than keyword overlap, and auto-evict
+   unused tools to keep the active set lean on very long runs.
 2. **Tree-sitter-backed edits** and a multi-file change planner, to move from
    "fix the obvious bug" to "fix the bug whose cause is three files away."
 3. A **larger, harder eval set** (regressions, flaky tests, multi-failure

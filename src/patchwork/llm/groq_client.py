@@ -102,7 +102,8 @@ class GroqClient(LLMClient):
                 retry_after = float(e.response.headers.get("retry-after"))  # type: ignore[union-attr]
             except Exception:
                 pass
-            raise RateLimitError("groq rate limit", retry_after=retry_after, status=429) from e
+            # Surface the limit detail (TPM/TPD/RPM) — the SDK message carries it.
+            raise RateLimitError(f"groq rate limit: {str(e)[:240]}", retry_after=retry_after, status=429) from e
         except g.APIStatusError as e:
             status = getattr(e, "status_code", None)
             if status and 500 <= status < 600:

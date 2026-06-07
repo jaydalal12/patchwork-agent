@@ -23,7 +23,7 @@ ORIENT ──▶ DIAGNOSE ──▶ FIX ──▶ VERIFY ──▶ REVIEW ──
 
 | # | Property | Where it lives |
 |---|----------|----------------|
-| 1 | **50+ tools / 4+ namespaces, model-driven** | `tools/` — **54 tools** across `git`, `github`, `ci`, `code`, `orchestration`. The model selects; `registry.py` dispatches by dict lookup (no conditional chain). `patchwork tools` lists them. |
+| 1 | **50+ tools / 4+ namespaces, model-driven** | `tools/` — **54 tools** across `git`, `github`, `ci`, `code`, `orchestration`. The model selects; `registry.py` dispatches by dict lookup (no conditional chain). `patchwork tools` lists them. Optional **dynamic loading** (`PATCHWORK_DYNAMIC_TOOLS`) advertises only meta-tools + what the model loads, to fit small context budgets. |
 | 2 | **Subagent in isolated context** | `agent/subagent.py` + `tools/orchestration_tools.py`. `analyze_failure` / `review_patch` spawn a *separate* `ConversationContext` with a **scoped, read-only registry** and return a schema-validated object. A read-scoped subagent physically cannot call a write tool. |
 | 3 | **Long-horizon ≥20 calls, context strategy in code** | `flows/repair.py` is a 20+ call task. `agent/context.py` holds the explicit, mechanical compaction strategy (pin the task + progress ledger, keep recent turns verbatim, stub the bulky middle). |
 | 4 | **Production scaffolding** | typed errors (`errors.py`), structured logs + span tracing (`observability.py`), retry w/ exponential backoff (`resilience/retry.py`), token-bucket rate limiting (`resilience/ratelimit.py`), eval harness (`eval/`), unit + integration tests (`tests/`), `Dockerfile`. |

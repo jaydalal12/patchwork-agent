@@ -36,6 +36,7 @@ patchwork doctor    # verify keys, git, provider, tool count
 | `PATCHWORK_MAX_TOOL_CALLS` | `60` | per-session tool-call budget |
 | `PATCHWORK_CONTEXT_TOKEN_BUDGET` | `120000` | transcript token budget before compaction |
 | `PATCHWORK_CONTEXT_KEEP_RECENT` | `8` | recent messages kept verbatim during compaction |
+| `PATCHWORK_DYNAMIC_TOOLS` | `false` | advertise only meta-tools + loaded tools (smaller requests; fits small free tiers) |
 | `PATCHWORK_LOG_LEVEL` / `PATCHWORK_LOG_JSON` | `INFO` / `false` | logging |
 
 ## Commands
@@ -82,6 +83,7 @@ tool schemas (~4.5k tokens) per call. To fit a small tier (e.g. Groq
 PATCHWORK_GROQ_MODEL=openai/gpt-oss-120b
 PATCHWORK_CONTEXT_TOKEN_BUDGET=3000
 PATCHWORK_CONTEXT_KEEP_RECENT=4
+PATCHWORK_DYNAMIC_TOOLS=true     # advertise only loaded tools — ~3x smaller requests
 ```
 
 Small fixes run clean; larger multi-fix repos need a higher tier (or the planned
