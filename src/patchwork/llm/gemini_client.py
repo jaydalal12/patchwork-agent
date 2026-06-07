@@ -110,7 +110,7 @@ def parse_response(resp: Any) -> AssistantTurn:
 
 
 class GeminiClient(LLMClient):
-    def __init__(self, api_key: str, model: str, *, max_output_tokens: int = 4096):
+    def __init__(self, api_key: str, model: str, *, max_output_tokens: int = 4096, rpm: int = 10):
         try:
             import google.generativeai as genai
         except ImportError as e:  # pragma: no cover
@@ -121,8 +121,10 @@ class GeminiClient(LLMClient):
         genai.configure(api_key=api_key)
         self.model = model
         self._max_output_tokens = max_output_tokens
-        # ~1 request / 5s, no bursting — keeps under free-tier per-minute limits.
-        self._limiter = RateLimiter(rate=0.2, burst=2)
+        # Pace to ~90% of the configured RPM, leaving headroom for the server's
+        # own accounting; never burst more than a few requests at once.
+        rate = max(0.05, (rpm * 0.9) / 60.0)
+        self._limiter = RateLimiter(rate=rate, burst=max(2, rpm // 6))
 
     def _call(self, system: str, contents, tools):
         genai = self._genai

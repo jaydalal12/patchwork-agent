@@ -32,6 +32,9 @@ class Settings(BaseModel):
     anthropic_model: str = "claude-opus-4-8"
     gemini_api_key: Optional[str] = None
     gemini_model: str = "gemini-2.5-pro"
+    # Requests/min budget for the client-side limiter. Match your tier:
+    # free 2.5-flash ~10, free 2.0-flash-lite ~30, paid much higher.
+    gemini_rpm: int = Field(default=10, ge=1)
 
     github_token: Optional[str] = None
 
@@ -69,6 +72,7 @@ class Settings(BaseModel):
             anthropic_model=os.getenv("PATCHWORK_ANTHROPIC_MODEL", "claude-opus-4-8"),
             gemini_api_key=os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"),
             gemini_model=os.getenv("PATCHWORK_GEMINI_MODEL", "gemini-2.5-pro"),
+            gemini_rpm=int(os.getenv("PATCHWORK_GEMINI_RPM", "10")),
             github_token=os.getenv("GITHUB_TOKEN"),
             max_tool_calls=int(os.getenv("PATCHWORK_MAX_TOOL_CALLS", "60")),
             context_token_budget=int(os.getenv("PATCHWORK_CONTEXT_TOKEN_BUDGET", "120000")),

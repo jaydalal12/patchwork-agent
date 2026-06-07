@@ -25,6 +25,6 @@ def build_llm(settings: Settings) -> LLMClient:
             raise ConfigError("provider=gemini but GEMINI_API_KEY is unset")
         from patchwork.llm.gemini_client import GeminiClient
 
-        return GeminiClient(settings.gemini_api_key, settings.gemini_model)
+        return GeminiClient(settings.gemini_api_key, settings.gemini_model, rpm=settings.gemini_rpm)
 
     raise ConfigError(f"unsupported provider {provider!r}")
