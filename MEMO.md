@@ -45,6 +45,14 @@ without any API key (a scripted LLM drives the real loop, sandbox, and pytest).
 - **A real patch/AST editor.** Edits are string- and line-range-based. This is
   enough for the bug classes in the fixtures and keeps diffs minimal, but it
   can't do semantic refactors.
+- **Dynamic tool loading.** All 54 tool schemas are sent on every request
+  (~4.5k tokens). On a large-context paid model this is irrelevant; on free
+  tiers it dominates the request. I measured Groq's `gpt-oss-120b` free tier at
+  ~8k tokens per request (and it counts `max_tokens` toward that cap) with a
+  ~8k/min TPM — so the schema overhead alone caps how many calls fit per minute.
+  Small fixes (e.g. the `off_by_one` fixture) run clean and verified-green on
+  free Groq; an 8-bug repo needs a higher tier. The right fix is a tool-search /
+  lazy-load step that sends only the relevant schemas per turn — see below.
 - **Persistent run store + dashboard.** Traces live in memory and print as a
   summary; I did not add a database or UI. The span model is there to make that
   a small addition, not a rewrite.
@@ -54,8 +62,11 @@ without any API key (a scripted LLM drives the real loop, sandbox, and pytest).
 
 ## What more time would address
 
-1. A **recorded-cassette** test layer for the two LLM providers and the GitHub
-   client, lifting real coverage of the adapter code without flaky live calls.
+1. **Dynamic tool loading** — expose namespaces plus a `search_tools`/`load_tools`
+   step so each turn carries only the ~8–12 relevant schemas instead of all 54.
+   This is the highest-leverage item: it cuts request size ~3×, makes the agent
+   viable on small free tiers, and is how registries actually stay coherent past
+   fifty tools without flooding context.
 2. **Tree-sitter-backed edits** and a multi-file change planner, to move from
    "fix the obvious bug" to "fix the bug whose cause is three files away."
 3. A **larger, harder eval set** (regressions, flaky tests, multi-failure
