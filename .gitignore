@@ -35,3 +35,6 @@ exported-conversation-*.txt
 
 # local recording prep (not part of submission)
 VIDEO_SCRIPT.md
+
+# local submission prep (not part of repo)
+SUBMISSION_EMAIL.md

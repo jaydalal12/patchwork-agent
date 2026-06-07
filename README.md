@@ -62,7 +62,7 @@ patchwork run --clone https://github.com/you/repo.git \
 ## Tests & evaluation
 
 ```bash
-pytest -q                        # 22 tests; integration drives the real loop
+pytest -q                        # 37 tests; integration drives the real loop
                                  # + sandbox + pytest via a scripted LLM (no key)
 python -m patchwork.eval.harness # pass@1 over seeded buggy repos (needs a key)
 ```
@@ -93,4 +93,9 @@ Safety: every file/test operation runs inside a `RepoSandbox` — an isolated
 clone with path confinement and command timeouts — so the agent can run
 untrusted suites without touching the host or the real default branch.
 
-See [`MEMO.md`](./MEMO.md) for what was cut and the design decision I defend.
+## Documentation
+
+- [`docs/USAGE.md`](./docs/USAGE.md) — install, configure, commands, env vars, free-tier tips, extending tools, troubleshooting.
+- [`docs/USECASES.md`](./docs/USECASES.md) — practical use cases and honest limits.
+- [`MEMO.md`](./MEMO.md) — what was cut, future work, and the design decision I defend.
+
